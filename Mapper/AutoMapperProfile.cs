@@ -13,5 +13,9 @@ public class AutoMapperProfile : Profile
     {
         // Topic
         CreateMap<Topic, TopicDTO>();
+        // Vocab
+        CreateMap<Vocabulary, VocabularyDTO>();
+        CreateMap<Practice, PracticeDTO>();
+        CreateMap<Question, QuestionDTO>();
     }
 }

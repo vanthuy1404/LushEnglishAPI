@@ -22,6 +22,17 @@ public class TopicController(LushEnglishDbContext context, IMapper mapper) : Con
     {
         var topics = _context.Topics.ToList();
         var results = _mapper.Map<List<TopicDTO>>(topics);
+        foreach (var result in results)
+        {
+            // Lấy từ vựng theo chủ đề
+            var vocabs = _context.Vocabularies.Where(x => x.TopicId == result.Id).ToList();
+            var vocabsDto = _mapper.Map<List<VocabularyDTO>>(vocabs);
+            result.Vocabularies = vocabsDto;
+            // Lay bai luyen tap
+            var practices  = _context.Practices.Where(x => x.TopicId == result.Id).ToList();
+            var practicesDto = _mapper.Map<List<PracticeDTO>>(practices);
+            result.Practices = practicesDto;
+        }
         return Ok(results);
     }
 

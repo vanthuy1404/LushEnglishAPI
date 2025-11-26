@@ -25,6 +25,6 @@ namespace LushEnglishAPI.Models
         public DateTime CreatedAt { get; set; } = DateTime.Now;
 
         // Navigation
-        public Topic Topic { get; set; }
+        public Topic? Topic { get; set; }
     }
 }
