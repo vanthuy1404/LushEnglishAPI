@@ -4,6 +4,7 @@ using LushEnglishAPI.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace LushEnglishAPI.Migrations
 {
     [DbContext(typeof(LushEnglishDbContext))]
-    partial class LushEnglishDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251127142556_UpdateRelationship_Practice_Chatting_Writing")]
+    partial class UpdateRelationship_Practice_Chatting_Writing
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -35,13 +38,6 @@ namespace LushEnglishAPI.Migrations
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
-
-                    b.Property<int>("Level")
-                        .HasColumnType("int");
-
-                    b.Property<string>("LinkImage")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
 
                     b.Property<int>("MaxAiReplies")
                         .HasColumnType("int");
@@ -81,13 +77,6 @@ namespace LushEnglishAPI.Migrations
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
-
-                    b.Property<int>("Level")
-                        .HasColumnType("int");
-
-                    b.Property<string>("LinkImage")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -190,6 +179,9 @@ namespace LushEnglishAPI.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<decimal?>("WritingScore")
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<string>("WritingText")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -213,13 +205,6 @@ namespace LushEnglishAPI.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("Level")
-                        .HasColumnType("int");
-
-                    b.Property<string>("LinkImage")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
@@ -316,13 +301,6 @@ namespace LushEnglishAPI.Migrations
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
-
-                    b.Property<int>("Level")
-                        .HasColumnType("int");
-
-                    b.Property<string>("LinkImage")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Name")
                         .IsRequired()

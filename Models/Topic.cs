@@ -14,9 +14,15 @@ public class Topic
 
     public string Description { get; set; }
     public string YoutubeUrl { get; set; }
+    [Required]
+    public int Level { get; set; } = 1; // 1: Beginner, 2: Intermediate, 3: Advanced
+    
+    public string LinkImage {get; set; } // src display Img
     public DateTime CreatedAt { get; set; } = DateTime.Now;
 
     // Navigation
     public ICollection<Practice>? Practices { get; set; }
+    public ICollection<ChattingConfig>? ChattingConfigs { get; set; }
+    public ICollection<WritingConfig>? WritingConfigs { get; set; }
     public ICollection<Vocabulary>? Vocabularies { get; set; }
 }

@@ -50,7 +50,8 @@ public class PracticeController(LushEnglishDbContext context, IMapper mapper) : 
             Id = Guid.CreateVersion7(),   // Tạo ID backend
             TopicId = dto.TopicId,
             Name = dto.Name,
-            PracticeType = dto.PracticeType,
+            Level = dto.Level,
+            LinkImage = dto.LinkImage,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -69,8 +70,8 @@ public class PracticeController(LushEnglishDbContext context, IMapper mapper) : 
         // Update fields
         practice.TopicId = dto.TopicId;
         practice.Name = dto.Name;
-        practice.PracticeType = dto.PracticeType;
-
+        practice.Level = dto.Level;
+        practice.LinkImage = dto.LinkImage;
         await context.SaveChangesAsync();
         return Ok(practice);
     }

@@ -9,11 +9,15 @@ public class Result
 {
     public Guid Id { get; set; } = Guid.CreateVersion7();
 
-    [Required] public Guid UserId { get; set; }
+    [Required]
+    public Guid UserId { get; set; }
 
-    [Required] public Guid PracticeId { get; set; }
+    // Polymorphic "loose foreign key"
+    [Required]
+    public Guid TargetId { get; set; }   // PracticeId or WritingConfigId or ChattingConfigId
 
-    [Required] public int PracticeType { get; set; } // match Practice.PracticeType
+    [Required]
+    public int PracticeType { get; set; } // 1 = Practice, 2 = Writing, 3 = Chatting
 
     public decimal? Score { get; set; }
     public int? TotalQuestions { get; set; }
@@ -21,7 +25,6 @@ public class Result
 
     public string WritingText { get; set; }
     public string WritingFeedback { get; set; }
-    public decimal? WritingScore { get; set; }
 
     public string ChatHistoryJson { get; set; }
     public string ChatEvaluation { get; set; }
@@ -29,7 +32,5 @@ public class Result
     public DateTime CreatedAt { get; set; } = DateTime.Now;
     public DateTime UpdatedAt { get; set; } = DateTime.Now;
 
-    // Navigation
     public User User { get; set; }
-    public Practice Practice { get; set; }
 }

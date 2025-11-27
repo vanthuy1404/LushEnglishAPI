@@ -32,6 +32,14 @@ public class TopicController(LushEnglishDbContext context, IMapper mapper) : Con
             var practices  = _context.Practices.Where(x => x.TopicId == result.Id).ToList();
             var practicesDto = _mapper.Map<List<PracticeDTO>>(practices);
             result.Practices = practicesDto;
+            // Lay bai chatting
+            var chattings = _context.ChattingConfigs.Where(x => x.TopicId == result.Id).ToList();
+            var chattingDtos = _mapper.Map<List<ChattingExerciseDTO>>(chattings);
+            result.ChattingExercises = chattingDtos;
+            // lay bai writing
+            var writings = _context.WritingConfigs.Where(x => x.TopicId == result.Id).ToList();
+            var writingDtos = _mapper.Map<List<WritingExerciseDTO>>(writings);
+            result.WritingExercises = writingDtos;
         }
         return Ok(results);
     }
@@ -45,6 +53,23 @@ public class TopicController(LushEnglishDbContext context, IMapper mapper) : Con
             return NotFound("Topic not found");
 
         var result = _mapper.Map<TopicDTO>(topic);
+        
+        // Lấy từ vựng theo chủ đề
+        var vocabs = _context.Vocabularies.Where(x => x.TopicId == result.Id).ToList();
+        var vocabsDto = _mapper.Map<List<VocabularyDTO>>(vocabs);
+        result.Vocabularies = vocabsDto;
+        // Lay bai luyen tap
+        var practices  = _context.Practices.Where(x => x.TopicId == result.Id).ToList();
+        var practicesDto = _mapper.Map<List<PracticeDTO>>(practices);
+        result.Practices = practicesDto;
+        // Lay bai chatting
+        var chattings = _context.ChattingConfigs.Where(x => x.TopicId == result.Id).ToList();
+        var chattingDtos = _mapper.Map<List<ChattingExerciseDTO>>(chattings);
+        result.ChattingExercises = chattingDtos;
+        // lay bai writing
+        var writings = _context.WritingConfigs.Where(x => x.TopicId == result.Id).ToList();
+        var writingDtos = _mapper.Map<List<WritingExerciseDTO>>(writings);
+        result.WritingExercises = writingDtos;
         return Ok(result);
     }
 
@@ -58,6 +83,8 @@ public class TopicController(LushEnglishDbContext context, IMapper mapper) : Con
             Name = topic.Name,
             Description = topic.Description,
             YoutubeUrl = topic.YoutubeUrl,
+            Level = topic.Level,
+            LinkImage = topic.LinkImage,
             CreatedAt = DateTime.UtcNow.AddHours(7)
         };
 
@@ -79,7 +106,8 @@ public class TopicController(LushEnglishDbContext context, IMapper mapper) : Con
         topic.Name = topicDto.Name;
         topic.Description = topicDto.Description;
         topic.YoutubeUrl = topicDto.YoutubeUrl;
-
+        topic.Level = topicDto.Level;
+        topic.LinkImage = topicDto.LinkImage;
         _context.Topics.Update(topic);
         await _context.SaveChangesAsync();
 

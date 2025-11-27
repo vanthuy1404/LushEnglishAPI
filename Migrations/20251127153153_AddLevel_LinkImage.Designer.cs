@@ -4,6 +4,7 @@ using LushEnglishAPI.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace LushEnglishAPI.Migrations
 {
     [DbContext(typeof(LushEnglishDbContext))]
-    partial class LushEnglishDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251127153153_AddLevel_LinkImage")]
+    partial class AddLevel_LinkImage
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

@@ -17,5 +17,7 @@ public class AutoMapperProfile : Profile
         CreateMap<Vocabulary, VocabularyDTO>();
         CreateMap<Practice, PracticeDTO>();
         CreateMap<Question, QuestionDTO>();
+        CreateMap<ChattingConfig, ChattingExerciseDTO>();
+        CreateMap<WritingConfig, WritingExerciseDTO>();
     }
 }
