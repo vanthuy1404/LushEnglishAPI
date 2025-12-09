@@ -261,6 +261,9 @@ namespace LushEnglishAPI.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("nvarchar(255)");
 
+                    b.Property<bool?>("IsAdmin")
+                        .HasColumnType("bit");
+
                     b.Property<string>("LoginSession")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");

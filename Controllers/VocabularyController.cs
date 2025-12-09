@@ -19,7 +19,7 @@ public class VocabularyController(LushEnglishDbContext context, IMapper mapper) 
     public async Task<ActionResult<List<VocabularyDTO>>> GetAllVocabularies()
     {
         var vocabularies = await context.Vocabularies.ToListAsync();
-        var results = mapper.Map<List<VocabularyDTO>>(vocabularies);
+        var results = mapper.Map<List<VocabularyDTO>>(vocabularies).OrderByDescending(x => x.CreatedAt).ToList();
         return Ok(results);
     }
 
@@ -42,6 +42,7 @@ public class VocabularyController(LushEnglishDbContext context, IMapper mapper) 
         var vocab = new Vocabulary
         {
             Id = Guid.NewGuid(),
+            TopicId = dto.TopicId,
             Word = dto.Word,
             Phonetic = dto.Phonetic,
             Meaning = dto.Meaning,

@@ -14,4 +14,7 @@ public class RegisterRequestDTO
     public string Email { get; set; }
 
     [Required, MaxLength(255)] public string Password { get; set; }
+    [Required, MaxLength(255)] public string ConfirmPassword { get; set; }
+
+    
 }

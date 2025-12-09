@@ -18,6 +18,8 @@ public class TopicDTO
     public string LinkImage {get; set; } // src display Img
     
     public DateTime CreatedAt { get; set; }
+    // Đây là property nhận file binary từ React gửi lên (key là 'image')
+    public IFormFile? Image { get; set; }
     public List<PracticeDTO>? Practices { get; set; }
     public List<WritingExerciseDTO>? WritingExercises { get; set; }
     public List<ChattingExerciseDTO>? ChattingExercises { get; set; }

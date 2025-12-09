@@ -1,11 +1,9 @@
 ﻿// 2025
 // DANGTHUY
 
-using LushEnglishAPI.Attributes;
 using LushEnglishAPI.Data;
 using LushEnglishAPI.DTOs;
 using LushEnglishAPI.Models;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -28,7 +26,7 @@ public class AuthController(LushEnglishDbContext context) : ControllerBase
 
             //valid user
             var userGetByRequest = await context.Users.FirstOrDefaultAsync(x => x.Email == request.Email);
-            if (userGetByRequest == null) return BadRequest("Invalid request, check again");
+            if (userGetByRequest == null) return BadRequest("Wrong email or password, check again");
 
             // valid password
             if (userGetByRequest.Password != request.Password) return BadRequest("Invalid request, check again");
@@ -40,7 +38,9 @@ public class AuthController(LushEnglishDbContext context) : ControllerBase
             var objectResult = new
             {
                 userId = userGetByRequest.Id,
-                sessionId = loginSession
+                sessionId = loginSession,
+                fullName = userGetByRequest.FullName,
+                avatarUrl = userGetByRequest.AvatarUrl
             };
 
             return Ok(objectResult);
@@ -59,9 +59,13 @@ public class AuthController(LushEnglishDbContext context) : ControllerBase
         try
         {
             if (request == null || string.IsNullOrEmpty(request.Email) || string.IsNullOrEmpty(request.Password) ||
-                string.IsNullOrEmpty(request.FullName))
+                string.IsNullOrEmpty(request.FullName) || string.IsNullOrEmpty(request.ConfirmPassword))
                 return BadRequest("Invalid request, check again");
+            if (request.Password != request.ConfirmPassword)
+            {
+                return BadRequest("Password not equal to ConfirmPassword, check again");
 
+            }
             //valid user
             var userGetByRequest = await context.Users.FirstOrDefaultAsync(x => x.Email == request.Email);
             if (userGetByRequest != null) return BadRequest("User exists, check again");
@@ -72,7 +76,8 @@ public class AuthController(LushEnglishDbContext context) : ControllerBase
                 Email = request.Email,
                 Password = request.Password,
                 AvatarUrl = "",
-                CreatedAt = DateTime.UtcNow.AddHours(7)
+                CreatedAt = DateTime.UtcNow.AddHours(7),
+                LoginSession = Guid.CreateVersion7().ToString()
             };
 
             context.Users.Add(userCreate);

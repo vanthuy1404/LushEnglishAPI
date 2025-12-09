@@ -16,8 +16,10 @@ public class AutoMapperProfile : Profile
         // Vocab
         CreateMap<Vocabulary, VocabularyDTO>();
         CreateMap<Practice, PracticeDTO>();
-        CreateMap<Question, QuestionDTO>();
+        CreateMap<Question, QuestionDTO>().ReverseMap();
         CreateMap<ChattingConfig, ChattingExerciseDTO>();
         CreateMap<WritingConfig, WritingExerciseDTO>();
+        CreateMap<User, UserInfoDTO>();
+        CreateMap<Result, UserResultDTO>();
     }
 }

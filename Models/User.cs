@@ -24,4 +24,5 @@ public class User
     public ICollection<Result> Results { get; set; }
 
     public string LoginSession { get; set; }
+    public bool? IsAdmin { get; set; }
 }

@@ -12,6 +12,7 @@ public class WritingExerciseDTO
 
     [Required]
     public Guid TopicId { get; set; }
+    public string? TopicName { get; set; }
 
     [Required, MaxLength(255)]
     public string Name { get; set; }

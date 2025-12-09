@@ -1,7 +1,9 @@
 ﻿// 19/11/2025 - 20:32:27
 // DANGTHUY
 
+using System.ComponentModel.DataAnnotations;
 using AutoMapper;
+using LushEnglishAPI.Attributes;
 using LushEnglishAPI.Data;
 using LushEnglishAPI.DTOs;
 using LushEnglishAPI.Models;
@@ -11,7 +13,7 @@ namespace LushEnglishAPI.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class TopicController(LushEnglishDbContext context, IMapper mapper) : ControllerBase
+public class TopicController(LushEnglishDbContext context, IMapper mapper, IWebHostEnvironment env) : ControllerBase
 {
     private readonly LushEnglishDbContext _context = context;
     private readonly IMapper _mapper = mapper;
@@ -21,7 +23,7 @@ public class TopicController(LushEnglishDbContext context, IMapper mapper) : Con
     public ActionResult<List<TopicDTO>> GetAllTopics()
     {
         var topics = _context.Topics.ToList();
-        var results = _mapper.Map<List<TopicDTO>>(topics);
+        var results = _mapper.Map<List<TopicDTO>>(topics).OrderByDescending(x => x.CreatedAt).ToList();
         foreach (var result in results)
         {
             // Lấy từ vựng theo chủ đề
@@ -73,18 +75,48 @@ public class TopicController(LushEnglishDbContext context, IMapper mapper) : Con
         return Ok(result);
     }
 
-    // POST: api/Topic
     [HttpPost]
-    public async Task<ActionResult<TopicDTO?>> CreateTopic([FromBody] TopicDTO topic)
+    public async Task<ActionResult<TopicDTO>> CreateTopic([FromForm] CreateTopicDTO request) // 3. Dùng [FromForm] và DTO mới
     {
+        string imagePathDb = ""; // Đường dẫn để lưu vào DB
+
+        // 4. Xử lý lưu file nếu có ảnh gửi lên
+        if (request.Image != null && request.Image.Length > 0)
+        {
+            // Tạo tên file duy nhất: GUID + đuôi file gốc (vd: .jpg)
+            var fileName = $"{Guid.NewGuid()}{Path.GetExtension(request.Image.FileName)}";
+            
+            // Đường dẫn vật lý: wwwroot/images
+            var folderPath = Path.Combine(env.WebRootPath, "images");
+
+            // Tạo thư mục nếu chưa có
+            if (!Directory.Exists(folderPath))
+            {
+                Directory.CreateDirectory(folderPath);
+            }
+
+            // Đường dẫn file đầy đủ
+            var filePath = Path.Combine(folderPath, fileName);
+
+            // Lưu file xuống đĩa
+            using (var stream = new FileStream(filePath, FileMode.Create))
+            {
+                await request.Image.CopyToAsync(stream);
+            }
+
+            // Đường dẫn tương đối lưu DB (để frontend hiển thị)
+            imagePathDb = $"/images/{fileName}";
+        }
+
+        // 5. Map dữ liệu sang Entity
         var newTopic = new Topic()
         {
             Id = Guid.CreateVersion7(),
-            Name = topic.Name,
-            Description = topic.Description,
-            YoutubeUrl = topic.YoutubeUrl,
-            Level = topic.Level,
-            LinkImage = topic.LinkImage,
+            Name = request.Name,
+            Description = request.Description,
+            YoutubeUrl = request.YoutubeUrl,
+            Level = request.Level,
+            LinkImage = imagePathDb, // Lưu đường dẫn /images/...
             CreatedAt = DateTime.UtcNow.AddHours(7)
         };
 
@@ -95,23 +127,90 @@ public class TopicController(LushEnglishDbContext context, IMapper mapper) : Con
         return Ok(result);
     }
 
-    // PUT: api/Topic/{id}
+    /// PUT: api/Topic/{id}
     [HttpPut("{id}")]
-    public async Task<ActionResult<TopicDTO?>> UpdateTopic(Guid id, [FromBody] TopicDTO topicDto)
+    public async Task<ActionResult<TopicDTO>> UpdateTopic(Guid id, [FromForm] CreateTopicDTO request)
     {
         var topic = await _context.Topics.FindAsync(id);
-        if (topic == null)
-            return NotFound("Topic not found");
+        if (topic == null) return NotFound("Topic not found");
 
-        topic.Name = topicDto.Name;
-        topic.Description = topicDto.Description;
-        topic.YoutubeUrl = topicDto.YoutubeUrl;
-        topic.Level = topicDto.Level;
-        topic.LinkImage = topicDto.LinkImage;
+        topic.Name = request.Name;
+        topic.Description = request.Description;
+        topic.YoutubeUrl = request.YoutubeUrl;
+        topic.Level = request.Level;
+
+        // Xử lý ảnh mới (nếu người dùng có chọn ảnh mới)
+        if (request.Image != null && request.Image.Length > 0)
+        {
+            // (Optional) Xóa ảnh cũ đi cho đỡ rác server
+            if (!string.IsNullOrEmpty(topic.LinkImage))
+            {
+                var oldPath = Path.Combine(env.WebRootPath, topic.LinkImage.TrimStart('/'));
+                if (System.IO.File.Exists(oldPath)) System.IO.File.Delete(oldPath);
+            }
+
+            // Lưu ảnh mới (Logic giống hệt Create)
+            var fileName = $"{Guid.NewGuid()}{Path.GetExtension(request.Image.FileName)}";
+            var folderPath = Path.Combine(env.WebRootPath, "images");
+            if (!Directory.Exists(folderPath)) Directory.CreateDirectory(folderPath);
+            
+            var filePath = Path.Combine(folderPath, fileName);
+            using (var stream = new FileStream(filePath, FileMode.Create))
+            {
+                await request.Image.CopyToAsync(stream);
+            }
+
+            topic.LinkImage = $"/images/{fileName}";
+        }
+        // Nếu request.Image == null thì giữ nguyên LinkImage cũ trong DB
+
         _context.Topics.Update(topic);
         await _context.SaveChangesAsync();
 
         var result = _mapper.Map<TopicDTO>(topic);
         return Ok(result);
     }
+    // DELETE: api/Topic/{id}
+    [HttpDelete("{id}")]
+    public async Task<ActionResult> DeleteTopic(Guid id)
+    {
+        var topic = await _context.Topics.FindAsync(id);
+        if (topic == null)
+            return NotFound("Topic not found");
+
+        // Xóa từ vựng
+        var vocabs = _context.Vocabularies.Where(x => x.TopicId == id).ToList();
+        _context.Vocabularies.RemoveRange(vocabs);
+
+        // Xóa bài luyện tập
+        var practices = _context.Practices.Where(x => x.TopicId == id).ToList();
+        _context.Practices.RemoveRange(practices);
+
+        // Xóa bài chatting
+        var chattings = _context.ChattingConfigs.Where(x => x.TopicId == id).ToList();
+        _context.ChattingConfigs.RemoveRange(chattings);
+
+        // Xóa bài writing
+        var writings = _context.WritingConfigs.Where(x => x.TopicId == id).ToList();
+        _context.WritingConfigs.RemoveRange(writings);
+
+        // Xóa topic
+        _context.Topics.Remove(topic);
+
+        await _context.SaveChangesAsync();
+
+        return Ok("Delete topic successfully");
+    }
+}
+
+public class CreateTopicDTO
+{
+    [Required] 
+    public string Name { get; set; }
+    public string Description { get; set; }
+    public string YoutubeUrl { get; set; }
+    public int Level { get; set; } = 1;
+    
+    // Đây là biến hứng file ảnh từ React (key='image')
+    public IFormFile? Image { get; set; }
 }

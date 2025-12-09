@@ -9,6 +9,7 @@ public class ChattingExerciseDTO
 {
     public Guid? Id { get; set; }
     public Guid TopicId { get; set; }
+    public string TopicName { get; set; }
     [Required, MaxLength(255)]
     public string Name { get; set; }
     [Required, MaxLength(255)]
@@ -23,6 +24,7 @@ public class ChattingExerciseDTO
     public int Level { get; set; } = 1; // 1: Beginner, 2: Intermediate, 3: Advanced
     
     public string LinkImage {get; set; } // src display Img
+    public IFormFile? Image { get; set; }
     [Required]
     public string OpeningQuestion { get; set; }
     public DateTime CreatedAt { get; set; }
