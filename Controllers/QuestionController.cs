@@ -3,6 +3,7 @@
 
 using System.ComponentModel.DataAnnotations;
 using AutoMapper;
+using LushEnglishAPI.Attributes;
 using LushEnglishAPI.Data;
 using LushEnglishAPI.DTOs;
 using LushEnglishAPI.Models; // Giả định đây là namespace chứa Model Question
@@ -54,6 +55,7 @@ public class QuestionController(LushEnglishDbContext context, IMapper mapper) : 
 
     // --- CREATE: api/Question ---
     [HttpPost]
+    [AdminCheck]
     public async Task<ActionResult<QuestionDTO>> CreateQuestion([FromBody] QuestionDTO dto)
     {
         if (!ModelState.IsValid)
@@ -82,6 +84,7 @@ public class QuestionController(LushEnglishDbContext context, IMapper mapper) : 
 
     // --- UPDATE: api/Question/{id} ---
     [HttpPut("{id}")]
+    [AdminCheck]
     public async Task<ActionResult> UpdateQuestion(Guid id, [FromBody] QuestionDTO dto)
     {
         if (id != dto.Id)
@@ -127,6 +130,7 @@ public class QuestionController(LushEnglishDbContext context, IMapper mapper) : 
 
     // --- DELETE: api/Question/{id} ---
     [HttpDelete("{id}")]
+    [AdminCheck]
     public async Task<ActionResult> DeleteQuestion(Guid id)
     {
         var question = await _context.Questions.FindAsync(id);

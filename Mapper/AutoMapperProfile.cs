@@ -2,6 +2,7 @@
 // DANGTHUY
 
 using AutoMapper;
+using LushEnglishAPI.Controllers;
 using LushEnglishAPI.DTOs;
 using LushEnglishAPI.Models;
 
@@ -21,5 +22,8 @@ public class AutoMapperProfile : Profile
         CreateMap<WritingConfig, WritingExerciseDTO>();
         CreateMap<User, UserInfoDTO>();
         CreateMap<Result, UserResultDTO>();
+        CreateMap<Course, CourseDTO>()
+            .ForMember(dest => dest.Topics, opt => opt.Ignore())
+            .ForMember(dest => dest.TopicCount, opt => opt.Ignore());
     }
 }

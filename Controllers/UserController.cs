@@ -32,6 +32,8 @@ public class UserController(LushEnglishDbContext context, IMapper mapper, IWebHo
 
     // GET: api/User/{id}
     [HttpGet("{id}")]
+    [SessionCheck]
+    [AdminCheck]
     public async Task<ActionResult<UserInfoDTO>> GetUser(Guid id)
     {
         var user = await _context.Users.FindAsync(id);
@@ -44,6 +46,7 @@ public class UserController(LushEnglishDbContext context, IMapper mapper, IWebHo
 
     // POST: api/User
     [HttpPost]
+    [AdminCheck]
     public async Task<ActionResult<UserInfoDTO>> CreateUser([FromBody] UserInfoDTO userDto)
     {
         var newUser = new User
@@ -65,6 +68,7 @@ public class UserController(LushEnglishDbContext context, IMapper mapper, IWebHo
 
     // PUT: api/User/{id}
     [HttpPut("{id}")]
+    [AdminCheck]
     public async Task<ActionResult<UserInfoDTO>> UpdateUser(Guid id, [FromBody] UserInfoDTO userDto)
     {
         var user = await _context.Users.FindAsync(id);
@@ -84,6 +88,7 @@ public class UserController(LushEnglishDbContext context, IMapper mapper, IWebHo
 
     // DELETE: api/User/{id}
     [HttpDelete("{id}")]
+    [AdminCheck]
     public async Task<IActionResult> DeleteUser(Guid id)
     {
         var user = await _context.Users.FindAsync(id);
@@ -99,122 +104,149 @@ public class UserController(LushEnglishDbContext context, IMapper mapper, IWebHo
     // PHẦN 2: API INFO CHO TRANG CÁ NHÂN
     // ==========================================
 
-    // GET: api/User/info/{id}
-    [HttpGet("info/{id}")]
-    [SessionCheck]
-    public async Task<ActionResult<UserInfoDTO>> GetFullUserInfo(Guid id)
+// GET: api/User/info/{id}
+[HttpGet("info/{id}")]
+[SessionCheck]
+public async Task<ActionResult<UserInfoDTO>> GetFullUserInfo(Guid id)
+{
+    // Lấy userId từ header (Key phải khớp với cái bạn set trong axiosService)
+    string headerUserId = Request.Headers["userId"].FirstOrDefault();
+
+    if (string.IsNullOrEmpty(headerUserId) || !headerUserId.Equals(id.ToString(), StringComparison.OrdinalIgnoreCase))
     {
-        // Lấy userId từ header (Key phải khớp với cái bạn set trong axiosService: 'userId')
-        string headerUserId = Request.Headers["userId"].FirstOrDefault();
+        return Unauthorized(new { message = "User ID mismatch or missing in headers." });
+    }
 
-        // Kiểm tra xem header có tồn tại không và có khớp với userId trong body gửi lên không
-        // Sử dụng Equals để so sánh chuỗi an toàn
-        if (string.IsNullOrEmpty(headerUserId) || !headerUserId.Equals(id.ToString(), StringComparison.OrdinalIgnoreCase))
+    // 1. Lấy thông tin User
+    var user = await _context.Users.FindAsync(id);
+    if (user == null)
+        return NotFound("User not found");
+
+    var userInfo = _mapper.Map<UserInfoDTO>(user);
+
+    // =========================
+    // ✅ ADD: CurrentStreak + BestStreak
+    // =========================
+    var today = DateTime.UtcNow.AddHours(7).Date;
+
+    // Lấy các ngày active gần đây (giới hạn 180 ngày cho chắc)
+    var activeDays = await _context.UserDailyLoginStreaks
+        .AsNoTracking()
+        .Where(x => x.UserId == id)
+        .OrderByDescending(x => x.ActivityDate)
+        .Select(x => x.ActivityDate)
+        .Take(180)
+        .ToListAsync();
+
+    userInfo.BestStreak = user.BestStreak; // int?
+
+    if (activeDays.Count == 0)
+    {
+        userInfo.CurrentStreak = 0;
+    }
+    else
+    {
+        var set = activeDays.ToHashSet();
+
+        DateTime startDate;
+        if (set.Contains(today)) startDate = today;
+        else if (set.Contains(today.AddDays(-1))) startDate = today.AddDays(-1);
+        else startDate = DateTime.MinValue;
+
+        if (startDate == DateTime.MinValue)
         {
-            // Trả về 401 Unauthorized nếu không khớp
-            return Unauthorized(new { message = "User ID mismatch or missing in headers." });
+            userInfo.CurrentStreak = 0;
         }
-        
-        // 1. Lấy thông tin User
-        var user = await _context.Users.FindAsync(id);
-        if (user == null) 
-            return NotFound("User not found");
-
-        var userInfo = _mapper.Map<UserInfoDTO>(user);
-
-        // 2. Lấy danh sách kết quả (Results) của user, sắp xếp mới nhất trước
-        var results = await _context.Results
-            .Where(r => r.UserId == id)
-            .OrderByDescending(r => r.CreatedAt)
-            .ToListAsync();
-
-        if (results.Any())
+        else
         {
-            // --- A. TÍNH TOÁN THỐNG KÊ (STATS) ---
-            
-            // Tổng điểm tích lũy
-            userInfo.TotalExp = results.Sum(r => r.Score ?? 0);
-            
-            // Điểm trung bình chung
-            userInfo.AverageScore = results.Average(r => r.Score ?? 0);
-
-            // Điểm trung bình từng kỹ năng (tránh chia cho 0)
-            
-            // Type 1: Multiple Choice
-            var type1Results = results.Where(r => r.PracticeType == 1).ToList();
-            userInfo.AverageScoreMultipleChoice = type1Results.Any() 
-                ? type1Results.Average(r => r.Score ?? 0) : 0;
-
-            // Type 2: Writing
-            var type2Results = results.Where(r => r.PracticeType == 2).ToList();
-            userInfo.AverageScoreWriting = type2Results.Any() 
-                ? type2Results.Average(r => r.Score ?? 0) : 0;
-
-            // Type 3: Chatting
-            var type3Results = results.Where(r => r.PracticeType == 3).ToList();
-            userInfo.AverageScoreChatting = type3Results.Any() 
-                ? type3Results.Average(r => r.Score ?? 0) : 0;
-
-
-            // --- B. MAP TÊN BÀI TẬP (Lookup Name) ---
-            
-            var resultDtos = _mapper.Map<List<UserResultDTO>>(results);
-
-            // Bước tối ưu: Gom ID để query tên bài tập 1 lần (tránh N+1 query)
-            var practiceIds = results.Where(r => r.PracticeType == 1).Select(r => r.TargetId).Distinct().ToList();
-            var writingIds = results.Where(r => r.PracticeType == 2).Select(r => r.TargetId).Distinct().ToList();
-            var chattingIds = results.Where(r => r.PracticeType == 3).Select(r => r.TargetId).Distinct().ToList();
-
-            // Truy vấn lấy Dictionary [Id, Name]
-            var practiceNames = await _context.Practices
-                .Where(p => practiceIds.Contains(p.Id))
-                .ToDictionaryAsync(p => p.Id, p => p.Name); 
-
-            var writingNames = await _context.WritingConfigs
-                .Where(w => writingIds.Contains(w.Id))
-                .ToDictionaryAsync(w => w.Id, w => w.Name);
-
-            var chattingNames = await _context.ChattingConfigs
-                .Where(c => chattingIds.Contains(c.Id))
-                .ToDictionaryAsync(c => c.Id, c => c.Name);
-
-            // Gán tên vào DTO
-            foreach (var item in resultDtos)
+            int streak = 0;
+            while (set.Contains(startDate))
             {
-                if (item.PracticeType == 1 && practiceNames.TryGetValue(item.TargetId, out var pName))
-                {
-                    item.PracticeName = pName;
-                }
-                else if (item.PracticeType == 2 && writingNames.TryGetValue(item.TargetId, out var wName))
-                {
-                    item.PracticeName = wName;
-                }
-                else if (item.PracticeType == 3 && chattingNames.TryGetValue(item.TargetId, out var cName))
-                {
-                    item.PracticeName = cName;
-                }
-                else
-                {
-                    item.PracticeName = "Unknown/Deleted Exercise";
-                }
+                streak++;
+                startDate = startDate.AddDays(-1);
             }
 
-            userInfo.Results = resultDtos;
+            userInfo.CurrentStreak = streak;
+
+            // Optional: nếu BestStreak đang null mà user đã có streak thì trả Best = max(best, current)
+            // (không update DB ở đây, chỉ trả về cho FE đẹp)
+            if ((userInfo.BestStreak ?? 0) < streak)
+                userInfo.BestStreak = streak;
         }
-        else 
+    }
+
+    // 2. Lấy danh sách kết quả (Results) của user, sắp xếp mới nhất trước
+    var results = await _context.Results
+        .Where(r => r.UserId == id)
+        .OrderByDescending(r => r.CreatedAt)
+        .ToListAsync();
+
+    if (results.Any())
+    {
+        // --- A. TÍNH TOÁN THỐNG KÊ (STATS) ---
+        userInfo.TotalExp = results.Sum(r => r.Score ?? 0);
+        userInfo.AverageScore = results.Average(r => r.Score ?? 0);
+
+        var type1Results = results.Where(r => r.PracticeType == 1).ToList();
+        userInfo.AverageScoreMultipleChoice = type1Results.Any()
+            ? type1Results.Average(r => r.Score ?? 0) : 0;
+
+        var type2Results = results.Where(r => r.PracticeType == 2).ToList();
+        userInfo.AverageScoreWriting = type2Results.Any()
+            ? type2Results.Average(r => r.Score ?? 0) : 0;
+
+        var type3Results = results.Where(r => r.PracticeType == 3).ToList();
+        userInfo.AverageScoreChatting = type3Results.Any()
+            ? type3Results.Average(r => r.Score ?? 0) : 0;
+
+        // --- B. MAP TÊN BÀI TẬP (Lookup Name) ---
+        var resultDtos = _mapper.Map<List<UserResultDTO>>(results);
+
+        var practiceIds = results.Where(r => r.PracticeType == 1).Select(r => r.TargetId).Distinct().ToList();
+        var writingIds = results.Where(r => r.PracticeType == 2).Select(r => r.TargetId).Distinct().ToList();
+        var chattingIds = results.Where(r => r.PracticeType == 3).Select(r => r.TargetId).Distinct().ToList();
+
+        var practiceNames = await _context.Practices
+            .Where(p => practiceIds.Contains(p.Id))
+            .ToDictionaryAsync(p => p.Id, p => p.Name);
+
+        var writingNames = await _context.WritingConfigs
+            .Where(w => writingIds.Contains(w.Id))
+            .ToDictionaryAsync(w => w.Id, w => w.Name);
+
+        var chattingNames = await _context.ChattingConfigs
+            .Where(c => chattingIds.Contains(c.Id))
+            .ToDictionaryAsync(c => c.Id, c => c.Name);
+
+        foreach (var item in resultDtos)
         {
-            // Nếu User mới tạo chưa làm bài nào, trả về 0 hết
-            userInfo.TotalExp = 0;
-            userInfo.AverageScore = 0;
-            userInfo.AverageScoreMultipleChoice = 0;
-            userInfo.AverageScoreWriting = 0;
-            userInfo.AverageScoreChatting = 0;
-            userInfo.Results = new List<UserResultDTO>();
+            if (item.PracticeType == 1 && practiceNames.TryGetValue(item.TargetId, out var pName))
+                item.PracticeName = pName;
+            else if (item.PracticeType == 2 && writingNames.TryGetValue(item.TargetId, out var wName))
+                item.PracticeName = wName;
+            else if (item.PracticeType == 3 && chattingNames.TryGetValue(item.TargetId, out var cName))
+                item.PracticeName = cName;
+            else
+                item.PracticeName = "Unknown/Deleted Exercise";
         }
 
-        return Ok(userInfo);
+        userInfo.Results = resultDtos;
     }
+    else
+    {
+        userInfo.TotalExp = 0;
+        userInfo.AverageScore = 0;
+        userInfo.AverageScoreMultipleChoice = 0;
+        userInfo.AverageScoreWriting = 0;
+        userInfo.AverageScoreChatting = 0;
+        userInfo.Results = new List<UserResultDTO>();
+    }
+
+    return Ok(userInfo);
+}
+
     [HttpPut("update-profile")]
+    [SessionCheck]
     public async Task<IActionResult> UpdateProfile([FromForm] UpdateProfileDTO request)
     {
         // 1. Tìm User

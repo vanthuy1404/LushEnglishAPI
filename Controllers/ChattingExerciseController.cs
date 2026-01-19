@@ -9,6 +9,7 @@ using LushEnglishAPI.Attributes;
 using LushEnglishAPI.Data;
 using LushEnglishAPI.DTOs;
 using LushEnglishAPI.Models;
+using LushEnglishAPI.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -22,7 +23,8 @@ public class ChattingController(
     IMapper mapper,
     IHttpClientFactory httpClientFactory,
     IOptions<GeminiApiSettings> apiSettings,
-    IWebHostEnvironment env) : ControllerBase
+    IWebHostEnvironment env,
+    TopicIdsService _topicIdsService) : ControllerBase
 {
     // GET: api/Chatting
     [HttpGet]
@@ -40,6 +42,56 @@ public class ChattingController(
             {
                 result.TopicName = topic.Name;
                 result.LinkImage = topic.LinkImage;
+            }
+        }
+
+        return Ok(results);
+    }
+    // GET: api/Chatting/my-chattings
+    [HttpGet("my-chattings")]
+    public async Task<ActionResult<List<ChattingExerciseDTO>>> GetMyChattings()
+    {
+        List<Guid> topicIds;
+
+        try
+        {
+            topicIds = await _topicIdsService.GetMyTopicIdsAsync();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // guest => không trả gì
+            return Ok(new List<ChattingExerciseDTO>());
+        }
+
+        if (topicIds.Count == 0)
+            return Ok(new List<ChattingExerciseDTO>());
+
+        // Lấy chatting theo quyền topicIds
+        var chattingConfigs = await context.ChattingConfigs
+            .Where(c => topicIds.Contains(c.TopicId))
+            .OrderByDescending(c => c.CreatedAt)
+            .ToListAsync();
+
+        var results = mapper.Map<List<ChattingExerciseDTO>>(chattingConfigs);
+
+        // ===== Bulk load Topic để fill TopicName + fallback LinkImage (tránh N+1) =====
+        var topicIdList = results.Select(x => x.TopicId).Distinct().ToList();
+
+        var topicMap = await context.Topics
+            .Where(t => topicIdList.Contains(t.Id))
+            .Select(t => new { t.Id, t.Name, t.LinkImage })
+            .ToDictionaryAsync(x => x.Id, x => x);
+
+        foreach (var r in results)
+        {
+            if (topicMap.TryGetValue(r.TopicId, out var t))
+            {
+                r.TopicName = t.Name;
+
+                // Nếu ChattingConfig có LinkImage riêng thì giữ,
+                // còn nếu rỗng thì fallback lấy ảnh Topic
+                if (string.IsNullOrEmpty(r.LinkImage))
+                    r.LinkImage = t.LinkImage ?? "";
             }
         }
 
@@ -64,6 +116,7 @@ public class ChattingController(
     }
 
     // POST: api/Chatting
+    [AdminCheck]
     [HttpPost]
     public async Task<ActionResult<ChattingExerciseDTO>> CreateChattingConfig([FromForm] CreateChattingExerciseDTO dto)
     {
@@ -125,6 +178,7 @@ public class ChattingController(
     }
 
     // PUT: api/Chatting/5a70d10c-f37c-4a3e-b873-1f1966a3311e
+    [AdminCheck]
     [HttpPut("{id}")]
     public async Task<ActionResult> UpdateChattingConfig(Guid id, [FromForm] CreateChattingExerciseDTO dto)
     {
@@ -190,6 +244,7 @@ public class ChattingController(
     }
 
     // DELETE: api/Chatting/5a70d10c-f37c-4a3e-b873-1f1966a3311e
+    [AdminCheck]
     [HttpDelete("{id}")]
     public async Task<ActionResult> DeleteChattingConfig(Guid id)
     {

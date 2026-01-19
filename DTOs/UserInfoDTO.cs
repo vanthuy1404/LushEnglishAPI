@@ -10,6 +10,8 @@ public class UserInfoDTO
     public string Email {get; set;}
     public string AvatarUrl {get; set;}
     public DateTime? CreatedAt {get; set;}
+    public int? CurrentStreak {get; set;}
+    public int? BestStreak {get; set;}
     public List<UserResultDTO>? Results {get; set;}
     public decimal? TotalExp {get; set;} // Tổng tất cả score
     public decimal? AverageScore {get; set;} // Điểm trung bình tất cả bài tập

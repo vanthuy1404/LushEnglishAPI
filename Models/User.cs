@@ -19,7 +19,8 @@ public class User
     [MaxLength(500)] public string AvatarUrl { get; set; }
 
     public DateTime CreatedAt { get; set; } = DateTime.Now;
-
+    // Streak
+    public int? BestStreak { get; set; } 
     // Navigation
     public ICollection<Result> Results { get; set; }
 

@@ -4,12 +4,14 @@
 using LushEnglishAPI.Data;
 using LushEnglishAPI.DTOs;
 using LushEnglishAPI.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace LushEnglishAPI.Controllers;
 
 [ApiController]
+[AllowAnonymous]
 [Route("api/[controller]")]
 public class AuthController(LushEnglishDbContext context) : ControllerBase
 {
@@ -40,7 +42,8 @@ public class AuthController(LushEnglishDbContext context) : ControllerBase
                 userId = userGetByRequest.Id,
                 sessionId = loginSession,
                 fullName = userGetByRequest.FullName,
-                avatarUrl = userGetByRequest.AvatarUrl
+                avatarUrl = userGetByRequest.AvatarUrl,
+                isAdmin = userGetByRequest.IsAdmin,
             };
 
             return Ok(objectResult);

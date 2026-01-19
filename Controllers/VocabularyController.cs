@@ -2,6 +2,7 @@
 // DANGTHUY
 
 using AutoMapper;
+using LushEnglishAPI.Attributes;
 using LushEnglishAPI.Data;
 using LushEnglishAPI.DTOs;
 using LushEnglishAPI.Models;
@@ -37,6 +38,7 @@ public class VocabularyController(LushEnglishDbContext context, IMapper mapper) 
 
     // POST: api/Vocabulary
     [HttpPost]
+    [AdminCheck]
     public async Task<ActionResult<VocabularyDTO>> CreateVocabulary([FromBody] VocabularyDTO dto)
     {
         var vocab = new Vocabulary
@@ -58,6 +60,7 @@ public class VocabularyController(LushEnglishDbContext context, IMapper mapper) 
 
     // PUT: api/Vocabulary/{id}
     [HttpPut("{id}")]
+    [AdminCheck]
     public async Task<ActionResult<VocabularyDTO>> UpdateVocabulary(Guid id, [FromBody] VocabularyDTO dto)
     {
         var vocab = await context.Vocabularies.FindAsync(id);
@@ -77,6 +80,7 @@ public class VocabularyController(LushEnglishDbContext context, IMapper mapper) 
 
     // DELETE: api/Vocabulary/{id}
     [HttpDelete("{id}")]
+    [AdminCheck]
     public async Task<IActionResult> DeleteVocabulary(Guid id)
     {
         var vocab = await context.Vocabularies.FindAsync(id);

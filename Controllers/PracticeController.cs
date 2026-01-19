@@ -7,6 +7,7 @@ using LushEnglishAPI.Attributes;
 using LushEnglishAPI.Data;
 using LushEnglishAPI.DTOs;
 using LushEnglishAPI.Models;
+using LushEnglishAPI.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -18,7 +19,8 @@ public class PracticeController(
     LushEnglishDbContext context, 
     IMapper mapper,
     // Thêm IWebHostEnvironment để truy cập wwwroot
-    IWebHostEnvironment env
+    IWebHostEnvironment env,
+    TopicIdsService _topicIdsService
 ) : ControllerBase
 {
     private readonly LushEnglishDbContext _context = context;
@@ -59,6 +61,65 @@ public class PracticeController(
                 result.TimeDuration = 0;
             }
 
+        }
+
+        return Ok(results);
+    }
+    
+    [HttpGet("my-practices")]
+    [SessionCheck]
+    public async Task<ActionResult<List<PracticeDTO>>> GetMyPractices()
+    {
+        List<Guid> topicIds;
+
+        try
+        {
+            topicIds = await _topicIdsService.GetMyTopicIdsAsync();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Ok(new List<PracticeDTO>());
+        }
+
+        if (topicIds.Count == 0)
+            return Ok(new List<PracticeDTO>());
+
+        var practices = await _context.Practices
+            .Where(p => topicIds.Contains(p.TopicId))
+            .OrderByDescending(p => p.CreatedAt)
+            .ToListAsync();
+
+        var results = _mapper.Map<List<PracticeDTO>>(practices);
+
+        // ===== Bulk load topic for TopicName + fallback image =====
+        var topicIdList = results.Select(x => x.TopicId).Distinct().ToList();
+
+        var topicMap = await _context.Topics
+            .Where(t => topicIdList.Contains(t.Id))
+            .Select(t => new { t.Id, t.Name, t.LinkImage })
+            .ToDictionaryAsync(x => x.Id, x => x);
+
+        // ===== Bulk count questions to avoid N+1 =====
+        var practiceIds = results.Select(x => x.Id).ToList();
+
+        var questionCounts = await _context.Questions
+            .Where(q => practiceIds.Contains(q.PracticeId))
+            .GroupBy(q => q.PracticeId)                 // ✅ Guid
+            .Select(g => new { PracticeId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.PracticeId, x => x.Count);
+        foreach (var r in results)
+        {
+            if (topicMap.TryGetValue(r.TopicId, out var t))
+            {
+                r.TopicName = t.Name;
+
+                if (string.IsNullOrEmpty(r.LinkImage))
+                    r.LinkImage = t.LinkImage ?? "";
+            }
+
+            var count = (r.Id.HasValue && questionCounts.TryGetValue(r.Id.Value, out var c)) ? c : 0;
+            r.NumberOfQuestions = count;
+            r.TimeDuration = count * 2;
         }
 
         return Ok(results);
@@ -105,6 +166,7 @@ public class PracticeController(
     }
     [HttpGet("admin/{id}")]
     [SessionCheck]
+    [AdminCheck]
     public async Task<ActionResult<Practice>> GetPracticeForAdmin(Guid id)
     {
         var practice = await _context.Practices.FindAsync(id);
@@ -140,7 +202,7 @@ public class PracticeController(
     // ----------------------------------------------------------------------
     // --- POST/PUT (Sửa để nhận [FromForm] và Image) ---
     // ----------------------------------------------------------------------
-
+    [AdminCheck]
     [HttpPost]
     public async Task<ActionResult<PracticeDTO>> CreatePractice([FromForm] CreatePracticeDTO request) // Dùng [FromForm] và DTO mới
     {
@@ -192,7 +254,7 @@ public class PracticeController(
         var result = _mapper.Map<PracticeDTO>(newPractice);
         return Ok(result);
     }
-
+    [AdminCheck]
     [HttpPut("{id}")]
     public async Task<ActionResult<PracticeDTO>> UpdatePractice(Guid id, [FromForm] CreatePracticeDTO request) // Dùng [FromForm] và DTO mới
     {
@@ -245,7 +307,7 @@ public class PracticeController(
     }
     
     // --- DELETE (Giữ nguyên logic cũ) ---
-
+    [AdminCheck]
     [HttpDelete("{id}")]
     public async Task<ActionResult> DeletePractice(Guid id)
     {

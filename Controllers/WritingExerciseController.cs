@@ -9,6 +9,7 @@ using LushEnglishAPI.Attributes;
 using LushEnglishAPI.Data;
 using LushEnglishAPI.DTOs;
 using LushEnglishAPI.Models;
+using LushEnglishAPI.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -23,7 +24,9 @@ public class WritingController(
     IOptions<GeminiApiSettings> apiSettings,
     IHttpClientFactory httpClientFactory,
     // 1. Thêm IWebHostEnvironment
-    IWebHostEnvironment env) : ControllerBase
+    IWebHostEnvironment env,
+    TopicIdsService _topicIdsService
+    ) : ControllerBase
 {
     // GET: api/Writing (Giữ nguyên)
     [HttpGet]
@@ -44,6 +47,55 @@ public class WritingController(
                 }
             }
         }
+        return Ok(results);
+    }
+    // GET: api/Writing/my-writings
+    [HttpGet("my-writings")]
+    [SessionCheck]
+    public async Task<ActionResult<List<WritingExerciseDTO>>> GetMyWritings()
+    {
+        List<Guid> topicIds;
+
+        try
+        {
+            topicIds = await _topicIdsService.GetMyTopicIdsAsync();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // guest => không trả gì
+            return Ok(new List<WritingExerciseDTO>());
+        }
+
+        if (topicIds.Count == 0)
+            return Ok(new List<WritingExerciseDTO>());
+
+        // Lấy writings theo quyền topicIds
+        var writingConfigs = await context.WritingConfigs
+            .Where(w => topicIds.Contains(w.TopicId))
+            .OrderByDescending(w => w.CreatedAt)
+            .ToListAsync();
+
+        var results = mapper.Map<List<WritingExerciseDTO>>(writingConfigs);
+
+        // ===== Bulk load topics để fill TopicName + fallback LinkImage (tránh N+1) =====
+        var topicIdList = results.Select(x => x.TopicId).Distinct().ToList();
+
+        var topicMap = await context.Topics
+            .Where(t => topicIdList.Contains(t.Id))
+            .Select(t => new { t.Id, t.Name, t.LinkImage })
+            .ToDictionaryAsync(x => x.Id, x => x);
+
+        foreach (var r in results)
+        {
+            if (topicMap.TryGetValue(r.TopicId, out var t))
+            {
+                r.TopicName = t.Name;
+
+                if (string.IsNullOrEmpty(r.LinkImage))
+                    r.LinkImage = t.LinkImage ?? "";
+            }
+        }
+
         return Ok(results);
     }
 
@@ -77,6 +129,7 @@ public class WritingController(
     // POST: api/Writing (CẬP NHẬT: Dùng FromForm & Lưu ảnh)
     // ---------------------------------------------------------
     [HttpPost]
+    [AdminCheck]
     public async Task<ActionResult<WritingExerciseDTO>> CreateWritingExercise([FromForm] CreateWritingExerciseDTO dto)
     {
         if (!ModelState.IsValid)
@@ -134,6 +187,7 @@ public class WritingController(
     // PUT: api/Writing/{id} (CẬP NHẬT: Dùng FromForm & Lưu ảnh)
     // ---------------------------------------------------------
     [HttpPut("{id}")]
+    [AdminCheck]
     public async Task<ActionResult> UpdateWritingExercise(Guid id, [FromForm] CreateWritingExerciseDTO dto)
     {
         var writingConfig = await context.WritingConfigs.FindAsync(id);
@@ -191,6 +245,7 @@ public class WritingController(
 
     // DELETE: api/Writing/{id} (Giữ nguyên)
     [HttpDelete("{id}")]
+    [AdminCheck]
     public async Task<ActionResult> DeleteWritingExercise(Guid id)
     {
         var writingConfig = await context.WritingConfigs.FindAsync(id);

@@ -18,6 +18,8 @@ public class Topic
     public int Level { get; set; } = 1; // 1: Beginner, 2: Intermediate, 3: Advanced
     
     public string LinkImage {get; set; } // src display Img
+    public Guid? CourseId { get; set; }   // nullable
+    public Course? Course { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.Now;
 
     // Navigation
