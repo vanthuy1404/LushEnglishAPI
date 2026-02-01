@@ -10,9 +10,11 @@ namespace LushEnglishAPI.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class UserController(LushEnglishDbContext context, IMapper mapper, IWebHostEnvironment environment) : ControllerBase
+public class UserController(LushEnglishDbContext
+ context, IMapper mapper, IWebHostEnvironment environment) : ControllerBase
 {
-    private readonly LushEnglishDbContext _context = context;
+    private readonly LushEnglishDbContext
+ _context = context;
     private readonly IMapper _mapper = mapper;
     private readonly IWebHostEnvironment _environment = environment;
 
@@ -169,7 +171,7 @@ public async Task<ActionResult<UserInfoDTO>> GetFullUserInfo(Guid id)
             userInfo.CurrentStreak = streak;
 
             // Optional: nếu BestStreak đang null mà user đã có streak thì trả Best = max(best, current)
-            // (không update DB ở đây, chỉ trả về cho FE đẹp)
+            // (không update _context ở đây, chỉ trả về cho FE đẹp)
             if ((userInfo.BestStreak ?? 0) < streak)
                 userInfo.BestStreak = streak;
         }
@@ -292,11 +294,11 @@ public async Task<ActionResult<UserInfoDTO>> GetFullUserInfo(Guid id)
                 await request.Avatar.CopyToAsync(stream);
             }
 
-            // Cập nhật đường dẫn vào DB (bắt đầu bằng /images/...)
+            // Cập nhật đường dẫn vào _context (bắt đầu bằng /images/...)
             user.AvatarUrl = $"/images/{newFileName}";
         }
 
-        // 4. Lưu DB
+        // 4. Lưu _context
         _context.Users.Update(user);
         await _context.SaveChangesAsync();
 
@@ -306,5 +308,63 @@ public async Task<ActionResult<UserInfoDTO>> GetFullUserInfo(Guid id)
             fullName = user.FullName,
             avatarUrl = user.AvatarUrl 
         });
+    }
+    [HttpGet("user-management")]
+    [SessionCheck]
+    [AdminCheck]
+    public async Task<ActionResult<List<UserManagementDto>>> GetUsersForManagement()
+    {
+        // 1) lấy list user + stats (COUNT result, SUM score)
+        var users = await _context.Users
+            .AsNoTracking()
+            .Select(u => new UserManagementDto
+            {
+                Id = u.Id,
+                FullName = u.FullName,
+                Email = u.Email,
+                AvatarUrl = u.AvatarUrl,
+                CreatedAt = u.CreatedAt,
+                IsAdmin = u.IsAdmin,
+                BestStreak = u.BestStreak,
+
+                PurchasedCourses = new List<PurchasedCourseDto>(),
+
+                CompletedExercisesCount = _context.Results.Count(r => r.UserId == u.Id),
+
+                TotalExperiencePoints = _context.Results
+                    .Where(r => r.UserId == u.Id)
+                    .Sum(r => (decimal?)(r.Score ?? 0m)) ?? 0m
+            })
+            .ToListAsync();
+
+        // 2) lấy tất cả courses PAID của các user trong 1 query
+        var userIds = users.Select(x => x.Id).ToList();
+
+        var paidCourses = await _context.UserCourses
+            .AsNoTracking()
+            .Where(uc => userIds.Contains(uc.UserId) && uc.Status == "PAID")
+            .OrderByDescending(uc => uc.PaidAt ?? uc.CreatedAt)
+            .Select(uc => new
+            {
+                uc.UserId,
+                Course = new PurchasedCourseDto
+                {
+                    CourseId = uc.CourseId,
+                    CourseName = uc.Course != null ? uc.Course.Name : null,
+                    Amount = uc.Amount,
+                    PaidAt = uc.PaidAt
+                }
+            })
+            .ToListAsync();
+
+        // 3) map courses vào đúng user
+        var dict = paidCourses
+            .GroupBy(x => x.UserId)
+            .ToDictionary(g => g.Key, g => g.Select(x => x.Course).ToList());
+
+        foreach (var u in users)
+            u.PurchasedCourses = dict.TryGetValue(u.Id, out var courses) ? courses : new List<PurchasedCourseDto>();
+
+        return Ok(users);
     }
 }
